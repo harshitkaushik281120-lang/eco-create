@@ -28,6 +28,7 @@ export interface UserProfile {
   gallery: GalleryPhoto[];
   quizHistory: QuizAttempt[];
   joinedChallenges: string[];
+  challengePhotos: Record<string, string>; // challengeId -> photo data URL
   dailyTasks: DailyTask[];
   lastTaskDate: string;
   joinedAt: string;
@@ -76,6 +77,7 @@ function freshUserProfile(username: string): UserProfile {
     gallery: [],
     quizHistory: [],
     joinedChallenges: [],
+    challengePhotos: {},
     dailyTasks: DEFAULT_TASKS.map(t => ({ ...t })),
     lastTaskDate: todayStr(),
     joinedAt: new Date().toISOString(),
@@ -122,6 +124,8 @@ interface AppContextType {
   // Challenges
   joinedChallenges: string[];
   joinChallenge: (id: string) => void;
+  challengePhotos: Record<string, string>;
+  submitChallengePhoto: (challengeId: string, photoSrc: string, xpReward: number) => void;
 
   // Notifications
   notification: Notification | null;
@@ -245,6 +249,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [updateUser]);
 
+  const submitChallengePhoto = useCallback((challengeId: string, photoSrc: string, xpReward: number) => {
+    setCurrentUser(prev => {
+      if (!prev) return prev;
+      if (prev.challengePhotos?.[challengeId]) return prev; // already submitted
+      const updated: UserProfile = {
+        ...prev,
+        points: prev.points + xpReward,
+        creations: prev.creations + 1,
+        challengePhotos: { ...(prev.challengePhotos ?? {}), [challengeId]: photoSrc },
+        joinedChallenges: prev.joinedChallenges.includes(challengeId)
+          ? prev.joinedChallenges
+          : [...prev.joinedChallenges, challengeId],
+        gallery: [
+          { type: 'upload', src: photoSrc, caption: `Challenge: ${challengeId}`, date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) },
+          ...prev.gallery,
+        ],
+      };
+      return updated;
+    });
+    showNotification({ icon: '🏆', text: `Challenge photo submitted! +${xpReward} XP`, sub: 'Your creation has been added to your gallery!' });
+  }, [showNotification]);
+
   const openModal = useCallback((title: string, body: string) => {
     setModalTitle(title); setModalBody(body); setModalOpen(true);
   }, []);
@@ -265,6 +291,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       completeTask,
       joinedChallenges: currentUser?.joinedChallenges ?? [],
       joinChallenge,
+      challengePhotos: currentUser?.challengePhotos ?? {},
+      submitChallengePhoto,
       notification, showNotification,
       modalOpen, modalTitle, modalBody, openModal, closeModal,
     }}>
