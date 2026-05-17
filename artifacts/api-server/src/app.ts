@@ -12,9 +12,9 @@ app.use(
     serializers: {
       req(req: Request) {
         return {
-          id: req.id,
-          method: req.method,
-          url: req.url?.split("?")[0],
+          id: (req as any).id,
+          method: (req as any).method,
+          url: (req as any).url?.split("?")[0],
         };
       },
       res(res: Response) {
